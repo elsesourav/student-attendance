@@ -66,6 +66,8 @@ function loadStudentList() {
         record.date === selectedDate && record.subjectId === subjectId
     );
 
+
+
     tableBody.innerHTML = '';
     enrolledStudents.forEach(student => {
         // Check if student was present in existing record
@@ -92,12 +94,67 @@ function loadStudentList() {
     }
 }
 
-function saveAttendance() {
+function getPresentStudentsList(presentIds, allStudents) {
+    return presentIds.map(id => {
+        const student = allStudents.find(s => s.id === id);
+        return student ? `<div>${student.name} (${student.rollNumber || '-'})</div>` : '';
+    }).join('');
+}
+
+function getAbsentStudentsList(absentIds, allStudents) {
+    return absentIds.map(id => {
+        const student = allStudents.find(s => s.id === id);
+        return student ? `<div>${student.name} (${student.rollNumber || '-'})</div>` : '';
+    }).join('');
+}
+
+function validateAttendanceForm() {
+    const subjectId = document.getElementById('subjectSelect').value;
+    const date = document.getElementById('attendanceDate').value;
+
+    if (!subjectId || !date) {
+        messageDialog.show({
+            type: 'error',
+            title: 'Error',
+            message: 'Please select subject and date',
+            showCancel: false
+        });
+        return false;
+    }
+
+    const subjects = JSON.parse(localStorage.getItem('subjects')) || [];
+    const subject = subjects.find(s => s.id === subjectId);
+    
+    if (!subject) {
+        messageDialog.show({
+            type: 'error',
+            title: 'Error',
+            message: 'Selected subject not found',
+            showCancel: false
+        });
+        return false;
+    }
+
+    return true;
+}
+
+function saveAttendance(event) {
+    event.preventDefault();
+    
+    if (!validateAttendanceForm()) {
+        return;
+    }
+
     const subjectId = document.getElementById('subjectSelect').value;
     const date = document.getElementById('attendanceDate').value;
     
     if (!subjectId || !date) {
-        showNotification('Please select subject and date', 'error');
+        messageDialog.show({
+            type: 'error',
+            title: 'Error',
+            message: 'Please select subject and date',
+            showCancel: false
+        });
         return;
     }
     
@@ -106,7 +163,12 @@ function saveAttendance() {
     const subject = subjects.find(s => s.id === subjectId);
     
     if (!subject) {
-        showNotification('Selected subject not found', 'error');
+        messageDialog.show({
+            type: 'error',
+            title: 'Error',
+            message: 'Selected subject not found',
+            showCancel: false
+        });
         return;
     }
     
@@ -117,11 +179,14 @@ function saveAttendance() {
     
     // Collect attendance data
     const attendees = [];
+    const absentees = [];
     
     enrolledStudents.forEach(student => {
         const checkbox = document.getElementById(`attendance_${student.id}`);
         if (checkbox && checkbox.checked) {
             attendees.push(student.id);
+        } else if (checkbox) {
+            absentees.push(student.id);
         }
     });
     
@@ -131,7 +196,8 @@ function saveAttendance() {
         date: date,
         subjectId: subject.id,
         subjectName: subject.name,
-        attendees: attendees,
+        attendees,
+        absentees,
         totalStudents: enrolledStudents.length,
         timestamp: new Date().toISOString()
     };
@@ -145,16 +211,43 @@ function saveAttendance() {
     );
     
     if (existingRecord) {
-        if (!confirm('Attendance record already exists for this date and subject. Do you want to update it?')) {
-            return;
-        }
-        // Update existing record
-        Object.assign(existingRecord, attendanceRecord);
-    } else {
-        // Add new record
-        records.push(attendanceRecord);
+        messageDialog.show({
+            type: 'warning',
+            title: 'Duplicate Record',
+            message: 'Attendance record already exists for this date and subject. Do you want to update it?',
+            confirmText: 'Update',
+            cancelText: 'Cancel',
+            onConfirm: () => {
+                // Update existing record
+                Object.assign(existingRecord, attendanceRecord);
+                localStorage.setItem('attendanceRecords', JSON.stringify(records));
+                
+                // Track attendance activity
+                addActivity('attendance', {
+                    subjectName: subject.name,
+                    date: date,
+                    present: attendees.length,
+                    total: enrolledStudents.length
+                });
+                
+                // Show success message
+                messageDialog.show({
+                    type: 'success',
+                    title: 'Success',
+                    message: 'Attendance updated successfully!',
+                    showCancel: false
+                });
+                
+                // Update button text
+                const saveBtn = document.getElementById('saveAttendanceBtn');
+                saveBtn.innerHTML = '<i class="fas fa-save"></i> Update Attendance';
+            }
+        });
+        return;
     }
     
+    // Add new record
+    records.push(attendanceRecord);
     localStorage.setItem('attendanceRecords', JSON.stringify(records));
     
     // Track attendance activity
@@ -166,10 +259,12 @@ function saveAttendance() {
     });
     
     // Show success message
-    showNotification(
-        existingRecord ? 'Attendance updated successfully!' : 'Attendance saved successfully!', 
-        'success'
-    );
+    messageDialog.show({
+        type: 'success',
+        title: 'Success',
+        message: 'Attendance saved successfully!',
+        showCancel: false
+    });
     
     // Update button text
     const saveBtn = document.getElementById('saveAttendanceBtn');
@@ -196,9 +291,4 @@ function addActivity(action, details) {
 
 function generateId() {
     return Math.random().toString(36).substr(2, 9);
-}
-
-function showNotification(message, type = 'info') {
-    // You can implement a notification system here
-    alert(message);
 }

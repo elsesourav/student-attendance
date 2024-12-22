@@ -1,3 +1,4 @@
+let user;
 // Dashboard functionality
 document.addEventListener('DOMContentLoaded', () => {
     loadDashboard();
@@ -7,19 +8,20 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function loadDashboard() {
+    updateWelcomeMessage(); // Update time every minute
     loadTodayAttendance();
     loadLastUpdated();
     loadRecentActivity();
-    updateWelcomeMessage(); // Update time every minute
 }
 
 function updateWelcomeMessage() {
     // Get teacher's name from localStorage
-    const user = JSON.parse(localStorage.getItem('currentUser'));
+    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+    const allUser = JSON.parse(localStorage.getItem('teachers'));
+    user = allUser.find(u => u.username === currentUser.username);
+
     const teacherNameElement = document.getElementById('teacherName');
-    if (teacherNameElement && user && user.name) {
-        teacherNameElement.textContent = user.name;
-    }
+    teacherNameElement.textContent = user.fullName || user.name;
 
     // Update current date
     const currentDateElement = document.getElementById('currentDate');
@@ -113,6 +115,7 @@ function loadRecentActivity() {
         li.className = 'activity-item';
         const activityTime = new Date(activity.timestamp);
         
+
         let icon, actionText;
         switch (activity.action) {
             case 'attendance':
@@ -142,6 +145,10 @@ function loadRecentActivity() {
             case 'subject_delete':
                 icon = 'trash';
                 actionText = `Removed subject: ${activity.details.name}`;
+                break;
+            case 'login':
+                icon = 'sign-in-alt';
+                actionText = `User logged in: ${user.username || 'unknown user'}`;
                 break;
             default:
                 icon = 'info-circle';

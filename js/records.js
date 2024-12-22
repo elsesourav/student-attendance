@@ -121,6 +121,9 @@ function updateSummary(records) {
             record.attendees.forEach(studentId => totalStudents.add(studentId));
             totalAttendance += record.attendees.length;
         }
+        if (record.absentees) {
+            record.absentees.forEach(studentId => totalStudents.add(studentId));
+        }
         totalPossibleAttendance += record.totalStudents || 0;
     });
     
@@ -136,8 +139,11 @@ function viewRecordDetails(recordId) {
     const records = JSON.parse(localStorage.getItem('attendanceRecords')) || [];
     const record = records.find(r => r.id === recordId);
     
+    
     if (record) {
-        const students = JSON.parse(localStorage.getItem('students')) || [];
+        let students = JSON.parse(localStorage.getItem('students')) || [];
+        students = students.filter(student => student.subjects && student.subjects.includes(record.subjectId));
+        
         const presentStudents = students.filter(student => record.attendees.includes(student.id));
         const absentStudents = students.filter(student => !record.attendees.includes(student.id));
         
@@ -167,7 +173,7 @@ function viewRecordDetails(recordId) {
                     ${presentStudents.length > 0 ? `
                         <ul>
                             ${presentStudents.map(student => `
-                                <li>${student.name} (${student.rollNumber || 'No Roll Number'})</li>
+                                <li>${student.name} (Roll No: ${student.rollNumber || 'No Roll Number'})</li>
                             `).join('')}
                         </ul>
                     ` : '<p>No students present</p>'}
@@ -177,7 +183,7 @@ function viewRecordDetails(recordId) {
                     ${absentStudents.length > 0 ? `
                         <ul>
                             ${absentStudents.map(student => `
-                                <li>${student.name} (${student.rollNumber || 'No Roll Number'})</li>
+                                <li>${student.name} (Roll No: ${student.rollNumber || 'No Roll Number'})</li>
                             `).join('')}
                         </ul>
                     ` : '<p>No students absent</p>'}

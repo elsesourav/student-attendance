@@ -55,9 +55,7 @@ function handleFormSubmit(event) {
         description: document.getElementById('subjectDescription').value.trim()
     };
 
-    // Validate required fields
-    if (!subjectData.name) {
-        showNotification('Subject name is required!', 'error');
+    if (!validateSubject(subjectData.name, currentEditingId)) {
         return;
     }
 
@@ -77,12 +75,6 @@ function addSubject(subjectData) {
     // Get existing subjects and add new one
     const subjects = JSON.parse(localStorage.getItem('subjects')) || [];
     
-    // Check for duplicate name
-    if (subjects.some(s => s.name.toLowerCase() === subjectData.name.toLowerCase())) {
-        showNotification('A subject with this name already exists!', 'error');
-        return;
-    }
-    
     subjects.push(subjectData);
     localStorage.setItem('subjects', JSON.stringify(subjects));
 
@@ -99,8 +91,12 @@ function addSubject(subjectData) {
     // Reload subjects table
     loadSubjects();
 
-    // Show success message
-    showNotification('Subject added successfully!', 'success');
+    messageDialog.show({
+        type: 'success',
+        title: 'Success',
+        message: 'Subject added successfully!',
+        showCancel: false
+    });
 }
 
 function updateSubject(subjectId, subjectData) {
@@ -108,17 +104,6 @@ function updateSubject(subjectId, subjectData) {
     const subjectIndex = subjects.findIndex(s => s.id === subjectId);
     
     if (subjectIndex !== -1) {
-        // Check for duplicate name, excluding the current subject
-        const duplicateName = subjects.some(s => 
-            s.id !== subjectId && 
-            s.name.toLowerCase() === subjectData.name.toLowerCase()
-        );
-        
-        if (duplicateName) {
-            showNotification('A subject with this name already exists!', 'error');
-            return;
-        }
-        
         subjects[subjectIndex] = {
             ...subjects[subjectIndex],
             ...subjectData
@@ -139,28 +124,45 @@ function updateSubject(subjectId, subjectData) {
         // Reload subjects table
         loadSubjects();
         
-        showNotification('Subject updated successfully!', 'success');
+        messageDialog.show({
+            type: 'success',
+            title: 'Success',
+            message: 'Subject updated successfully!',
+            showCancel: false
+        });
     }
 }
 
 function deleteSubject(subjectId) {
-    if (confirm('Are you sure you want to delete this subject?')) {
-        let subjects = JSON.parse(localStorage.getItem('subjects')) || [];
-        const subjectToDelete = subjects.find(s => s.id === subjectId);
-        subjects = subjects.filter(subject => subject.id !== subjectId);
-        localStorage.setItem('subjects', JSON.stringify(subjects));
-        
-        // Track delete activity
-        if (subjectToDelete) {
-            addActivity('subject_delete', {
-                name: subjectToDelete.name,
-                code: subjectToDelete.code
+    messageDialog.show({
+        type: 'warning',
+        title: 'Confirm Delete',
+        message: 'Are you sure you want to delete this subject?',
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        onConfirm: () => {
+            let subjects = JSON.parse(localStorage.getItem('subjects')) || [];
+            const subjectToDelete = subjects.find(s => s.id === subjectId);
+            subjects = subjects.filter(subject => subject.id !== subjectId);
+            localStorage.setItem('subjects', JSON.stringify(subjects));
+            
+            // Track delete activity
+            if (subjectToDelete) {
+                addActivity('subject_delete', {
+                    name: subjectToDelete.name,
+                    code: subjectToDelete.code
+                });
+            }
+            
+            loadSubjects();
+            messageDialog.show({
+                type: 'success',
+                title: 'Success',
+                message: 'Subject deleted successfully!',
+                showCancel: false
             });
         }
-        
-        loadSubjects();
-        showNotification('Subject deleted successfully!', 'success');
-    }
+    });
 }
 
 function editSubject(subjectId) {
@@ -209,18 +211,51 @@ function generateId() {
     return Math.random().toString(36).substr(2, 9);
 }
 
-function showNotification(message, type = 'info') {
-    // You can implement a notification system here
-    alert(message);
+function validateSubject(name, editingId = null) {
+    if (!name.trim()) {
+        messageDialog.show({
+            type: 'error',
+            title: 'Error',
+            message: 'Subject name is required!',
+            showCancel: false
+        });
+        return false;
+    }
+
+    const subjects = JSON.parse(localStorage.getItem('subjects')) || [];
+    const exists = subjects.some(subject => 
+        subject.name.toLowerCase() === name.toLowerCase() && 
+        subject.id !== editingId
+    );
+
+    if (exists) {
+        messageDialog.show({
+            type: 'error',
+            title: 'Error',
+            message: 'A subject with this name already exists!',
+            showCancel: false
+        });
+        return false;
+    }
+
+    return true;
 }
 
-function addActivity(type, data) {
+function addActivity(action, details) {
     const activities = JSON.parse(localStorage.getItem('activities')) || [];
-    activities.push({
-        type,
-        data,
+    const activity = {
+        id: generateId(),
+        action,
+        details,
         timestamp: new Date().toISOString()
-    });
+    };
+    activities.unshift(activity); // Add to beginning of array
+    
+    // Keep only last 50 activities
+    if (activities.length > 50) {
+        activities.pop();
+    }
+    
     localStorage.setItem('activities', JSON.stringify(activities));
 }
 

@@ -160,30 +160,45 @@ function saveStudent(event) {
     localStorage.setItem('students', JSON.stringify(students));
     closeModal();
     loadStudents();
-    showNotification(`Student ${editingId ? 'updated' : 'added'} successfully!`, 'success');
+    messageDialog.show({
+        type: 'success',
+        title: 'Success',
+        message: `Student ${editingId ? 'updated' : 'added'} successfully!`,
+        showCancel: false
+    });
 }
 
 function deleteStudent(studentId) {
-    if (!confirm('Are you sure you want to delete this student?')) {
-        return;
-    }
-    
-    const students = JSON.parse(localStorage.getItem('students')) || [];
-    const studentToDelete = students.find(s => s.id === studentId);
-    const updatedStudents = students.filter(student => student.id !== studentId);
-    
-    localStorage.setItem('students', JSON.stringify(updatedStudents));
-    
-    // Track delete activity
-    if (studentToDelete) {
-        addActivity('student_delete', {
-            name: studentToDelete.name,
-            rollNumber: studentToDelete.rollNumber
-        });
-    }
-    
-    loadStudents();
-    showNotification('Student deleted successfully!', 'success');
+    messageDialog.show({
+        type: 'warning',
+        title: 'Confirm Delete',
+        message: 'Are you sure you want to delete this student? This action cannot be undone.',
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        onConfirm: () => {
+            const students = JSON.parse(localStorage.getItem('students')) || [];
+            const studentToDelete = students.find(s => s.id === studentId);
+            const updatedStudents = students.filter(student => student.id !== studentId);
+            
+            localStorage.setItem('students', JSON.stringify(updatedStudents));
+            
+            // Track delete activity
+            if (studentToDelete) {
+                addActivity('student_delete', {
+                    name: studentToDelete.name,
+                    rollNumber: studentToDelete.rollNumber
+                });
+            }
+            
+            loadStudents();
+            messageDialog.show({
+                type: 'success',
+                title: 'Success',
+                message: 'Student deleted successfully!',
+                showCancel: false
+            });
+        }
+    });
 }
 
 function editStudent(studentId) {
@@ -195,17 +210,20 @@ function generateId() {
     return Math.random().toString(36).substr(2, 9);
 }
 
-function addActivity(type, data) {
+function addActivity(action, details) {
     const activities = JSON.parse(localStorage.getItem('activities')) || [];
-    activities.push({
-        type: type,
-        data: data,
+    const activity = {
+        id: generateId(),
+        action,
+        details,
         timestamp: new Date().toISOString()
-    });
+    };
+    activities.unshift(activity); // Add to beginning of array
+    
+    // Keep only last 50 activities
+    if (activities.length > 50) {
+        activities.pop();
+    }
+    
     localStorage.setItem('activities', JSON.stringify(activities));
-}
-
-function showNotification(message, type = 'info') {
-    // You can implement a notification system here
-    alert(message);
 }
